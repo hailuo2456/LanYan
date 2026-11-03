@@ -38,6 +38,8 @@
 
 点击上方按钮前往 [Releases](https://github.com/hailuo2456/LanYan/releases) 下载最新的 `LanYan-1.4.1.apk`，源码压缩包也在同一页面提供。
 
+> 想体验旧版？见 [历史版本归档（1.0.0 – 1.4.0）](https://github.com/hailuo2456/LanYan/releases/tag/legacy-builds)（已废弃的液态玻璃 Beta 未收录）。
+
 > 当前为调试签名版本，安装时系统可能提示"未知来源"，选择继续安装即可。
 
 ## 🧱 从源码构建
