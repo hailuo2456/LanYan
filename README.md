@@ -10,6 +10,7 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
 ![Version](https://img.shields.io/badge/version-1.4.1-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -33,9 +34,9 @@
 
 ## 🚀 下载与安装
 
-[![Download APK](https://img.shields.io/badge/下载-LanYan.apk-2ea44f?logo=android&logoColor=white)](https://github.com/hailuo2456/LanYan/raw/main/LanYan.apk)
+[![Download APK](https://img.shields.io/badge/下载-LanYan--1.4.1.apk-2ea44f?logo=android&logoColor=white)](https://github.com/hailuo2456/LanYan/releases/latest)
 
-点击上方按钮，或直接下载仓库根目录的 [`LanYan.apk`](LanYan.apk)。
+点击上方按钮前往 [Releases](https://github.com/hailuo2456/LanYan/releases) 下载最新的 `LanYan-1.4.1.apk`，源码压缩包也在同一页面提供。
 
 > 当前为调试签名版本，安装时系统可能提示"未知来源"，选择继续安装即可。
 
@@ -141,4 +142,7 @@ docs/                         开发文档与截图
 - 本项目与 DeepSeek、OpenAI 等服务商无任何关联
 - 使用需要自备模型 API Key，产生的费用由对应服务商收取
 - AI 生成内容可能存在错误，请自行核对重要信息
-- 项目暂未指定开源协议，如需开源分发请补充 `LICENSE`
+
+## 📄 License
+
+本项目基于 [MIT License](LICENSE) 开源，Copyright (c) 2026 hailuo2456。
