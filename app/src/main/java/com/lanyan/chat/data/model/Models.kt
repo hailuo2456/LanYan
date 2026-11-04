@@ -96,4 +96,5 @@ data class PreparedPrompt(
 data class AvatarSettings(
     val userAvatar: String? = null,
     val aiAvatar: String? = null,
+    val chatBackground: String? = null,
 )

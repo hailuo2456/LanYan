@@ -5,6 +5,13 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -337,9 +344,29 @@ private fun ChatContent(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.background,
+    val backgroundPath = state.avatars.chatBackground
+    Box(modifier = modifier.fillMaxSize()) {
+        if (!backgroundPath.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current).data(File(backgroundPath)).build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alpha = 0.45f,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.55f)),
+            )
+        }
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = if (!backgroundPath.isNullOrBlank()) {
+                Color.Transparent
+            } else {
+                MaterialTheme.colorScheme.background
+            },
         topBar = {
             CenterAlignedTopAppBar(
                 navigationIcon = {
@@ -383,7 +410,13 @@ private fun ChatContent(
                     }
                 },
                 actions = { IconButton(onClick = onNewChat) { Icon(Icons.Rounded.Add, "新对话") } },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = if (!backgroundPath.isNullOrBlank()) {
+                            Color.Transparent
+                        } else {
+                            MaterialTheme.colorScheme.background
+                        },
+                    ),
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -407,6 +440,7 @@ private fun ChatContent(
                     input = ""
                 },
                 onToggleMemory = onToggleMemory,
+                transparentBackground = !backgroundPath.isNullOrBlank(),
                 onSend = {
                     val editing = editingMessage
                     if (editing != null) {
@@ -474,14 +508,19 @@ private fun ChatContent(
                     }
                 }
             }
-            if (state.messages.isNotEmpty() && !isAtBottom) {
+            AnimatedVisibility(
+                visible = state.messages.isNotEmpty() && !isAtBottom,
+                enter = fadeIn() + scaleIn(initialScale = 0.85f),
+                exit = fadeOut() + scaleOut(targetScale = 0.85f),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 18.dp, bottom = 12.dp),
+            ) {
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shadowElevation = 3.dp,
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 18.dp, bottom = 12.dp)
                         .size(40.dp)
                         .clickable {
                             coroutineScope.launch {
@@ -500,6 +539,7 @@ private fun ChatContent(
                 }
             }
         }
+    }
     }
 
     if (showDraftSettings) {
@@ -923,36 +963,45 @@ private fun ChatInput(
     editing: Boolean,
     onCancelEdit: () -> Unit,
     onToggleMemory: () -> Unit,
+    transparentBackground: Boolean,
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background) {
+    Surface(
+        color = if (transparentBackground) Color.Transparent else MaterialTheme.colorScheme.background,
+    ) {
         Column(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (editing) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 8.dp, bottomEnd = 8.dp),
-                    modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+            AnimatedVisibility(
+                visible = editing,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 8.dp, bottomEnd = 8.dp),
+                        modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth(),
                     ) {
-                        Text(
-                            "修改输入",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = onCancelEdit, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Rounded.Close, contentDescription = "取消修改", modifier = Modifier.size(18.dp))
+                        Row(
+                            modifier = Modifier.padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "修改输入",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
+                            )
+                            IconButton(onClick = onCancelEdit, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Rounded.Close, contentDescription = "取消修改", modifier = Modifier.size(18.dp))
+                            }
                         }
                     }
+                    Spacer(Modifier.height(6.dp))
                 }
-                Spacer(Modifier.height(6.dp))
             }
             if (pendingImages.isNotEmpty()) {
                 Row(
@@ -988,12 +1037,13 @@ private fun ChatInput(
                     }
                 }
             }
-            Row(
-                modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
+            AnimatedVisibility(visible = !editing, enter = fadeIn(), exit = fadeOut()) {
+                Row(
+                    modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth().padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(18.dp),
                     color = if (memoryEnabled) {
                         MaterialTheme.colorScheme.primaryContainer
                     } else {
@@ -1035,6 +1085,7 @@ private fun ChatInput(
                         )
                     }
                 }
+            }
             }
             val canSend = sending || value.isNotBlank() || pendingImages.isNotEmpty()
             OutlinedTextField(

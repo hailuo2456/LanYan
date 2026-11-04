@@ -3,6 +3,7 @@ package com.lanyan.chat
 import android.app.Application
 import androidx.room.Room
 import com.lanyan.chat.data.local.AvatarStorage
+import com.lanyan.chat.data.local.BackgroundStorage
 import com.lanyan.chat.data.local.ChatImageStorage
 import com.lanyan.chat.data.local.LanYanDatabase
 import com.lanyan.chat.data.local.SettingsStore
@@ -37,6 +38,7 @@ class AppContainer(context: android.content.Context) {
 
     val settingsStore = SettingsStore(context)
     val avatarStorage = AvatarStorage(context)
+    val backgroundStorage = BackgroundStorage(context)
     val chatImageStorage = ChatImageStorage(context)
     val chatRepository = ChatRepository(database.conversationDao(), database.messageDao())
     val memoryRepository = MemoryRepository(database.memoryDao())

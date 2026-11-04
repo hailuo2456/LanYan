@@ -9,7 +9,7 @@
 ![Platform](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![Version](https://img.shields.io/badge/version-1.6.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -22,6 +22,7 @@
 - **会话级人设**：每个对话可单独设置 AI 头像、用户头像、系统提示词；也可以在新对话开始前预设
 - **消息编辑**：点击消息显示复制 / 修改，修改后自动重新生成回复；长回复可一键回到底部
 - **长期记忆开关**：输入框上方可临时开关本机的长期记忆，不修改全局设置
+- **聊天背景**：设置 → 外观 可选择一张图片作为聊天页背景，自动叠加半透明蒙层保证可读性
 - **群组模式（Beta）**：选取 2–4 个已有对话作为智能体，拉进同一个群聊依次发言
 - **Agent 记忆**：短期上下文 + 长期用户记忆 + 会话摘要三层结构，自动提取偏好与事实，可手动管理
 - **体验细节**：AI 生成首页开场问题（本地缓存省 Token）、自动会话标题、深浅色主题、启动动画、头像裁剪
@@ -36,9 +37,9 @@
 
 ## 🚀 下载与安装
 
-[![Download APK](https://img.shields.io/badge/下载-LanYan--1.5.0.apk-2ea44f?logo=android&logoColor=white)](https://github.com/hailuo2456/LanYan/releases/latest)
+[![Download APK](https://img.shields.io/badge/下载-LanYan--1.6.0.apk-2ea44f?logo=android&logoColor=white)](https://github.com/hailuo2456/LanYan/releases/latest)
 
-点击上方按钮前往 [Releases](https://github.com/hailuo2456/LanYan/releases) 下载最新的 `LanYan-1.5.0.apk`，源码压缩包也在同一页面提供。
+点击上方按钮前往 [Releases](https://github.com/hailuo2456/LanYan/releases) 下载最新的 `LanYan-1.6.0.apk`，源码压缩包也在同一页面提供。
 
 > 想体验旧版？见 [历史版本归档（1.0.0 – 1.4.0）](https://github.com/hailuo2456/LanYan/releases/tag/legacy-builds)（已废弃的液态玻璃 Beta 未收录）。
 

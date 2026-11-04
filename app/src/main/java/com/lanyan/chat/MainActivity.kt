@@ -93,8 +93,10 @@ class MainActivity : ComponentActivity() {
                                 onTest = mainViewModel::testConnection,
                                         onThemeChange = mainViewModel::setThemeMode,
                                         onGroupModeChange = mainViewModel::setGroupMode,
-                                onSaveAvatar = mainViewModel::saveCroppedAvatar,
-                                onRemoveAvatar = mainViewModel::removeAvatar,
+                                        onSaveAvatar = mainViewModel::saveCroppedAvatar,
+                                        onRemoveAvatar = mainViewModel::removeAvatar,
+                                        onImportBackground = mainViewModel::importBackground,
+                                        onRemoveBackground = mainViewModel::removeBackground,
                                 onDismissNotice = mainViewModel::dismissNotice,
                             )
                         }

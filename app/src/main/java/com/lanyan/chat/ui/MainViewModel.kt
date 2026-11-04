@@ -734,6 +734,29 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    fun importBackground(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val old = _uiState.value.avatars.chatBackground
+                val path = container.backgroundStorage.import(uri)
+                container.settingsStore.saveChatBackground(path)
+                container.backgroundStorage.remove(old)
+                showNotice("聊天背景已更新")
+            } catch (error: Exception) {
+                showNotice(error.message ?: "背景设置失败")
+            }
+        }
+    }
+
+    fun removeBackground() {
+        viewModelScope.launch {
+            val old = _uiState.value.avatars.chatBackground
+            container.settingsStore.saveChatBackground(null)
+            container.backgroundStorage.remove(old)
+            showNotice("已恢复默认背景")
+        }
+    }
+
     fun addMemory(content: String, category: MemoryCategory) {
         if (content.isBlank()) return
         viewModelScope.launch(Dispatchers.IO) {

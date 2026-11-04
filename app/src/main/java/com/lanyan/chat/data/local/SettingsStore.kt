@@ -90,6 +90,7 @@ class SettingsStore(private val context: Context) {
         AvatarSettings(
             userAvatar = values[Keys.USER_AVATAR]?.takeIf { it.isNotBlank() },
             aiAvatar = values[Keys.AI_AVATAR]?.takeIf { it.isNotBlank() },
+            chatBackground = values[Keys.CHAT_BACKGROUND]?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -162,6 +163,12 @@ class SettingsStore(private val context: Context) {
         }
     }
 
+    suspend fun saveChatBackground(path: String?) {
+        context.settingsDataStore.edit { values ->
+            if (path == null) values.remove(Keys.CHAT_BACKGROUND) else values[Keys.CHAT_BACKGROUND] = path
+        }
+    }
+
     suspend fun setMemoryEnabled(enabled: Boolean) {
         context.settingsDataStore.edit { it[Keys.MEMORY_ENABLED] = enabled }
     }
@@ -190,6 +197,7 @@ class SettingsStore(private val context: Context) {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val USER_AVATAR = stringPreferencesKey("user_avatar")
         val AI_AVATAR = stringPreferencesKey("ai_avatar")
+        val CHAT_BACKGROUND = stringPreferencesKey("chat_background")
         val SUGGESTIONS = stringPreferencesKey("home_suggestions")
         val SUGGESTIONS_AT = longPreferencesKey("home_suggestions_at")
         val SUGGESTIONS_MESSAGES = intPreferencesKey("home_suggestions_messages")

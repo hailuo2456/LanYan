@@ -3,6 +3,7 @@ package com.lanyan.chat.ui.screens
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,14 +14,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
@@ -52,11 +56,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.lanyan.chat.data.model.ApiSettings
 import com.lanyan.chat.data.model.ModelProfile
 import com.lanyan.chat.data.model.ThemeMode
@@ -64,6 +71,7 @@ import com.lanyan.chat.ui.MainUiState
 import com.lanyan.chat.ui.components.AvatarCropDialog
 import com.lanyan.chat.ui.components.ChatAvatar
 import kotlinx.coroutines.launch
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +82,8 @@ fun SettingsScreen(
     onTest: (ApiSettings) -> Unit,
     onSaveAvatar: (android.graphics.Bitmap, Boolean) -> Unit,
     onRemoveAvatar: (Boolean) -> Unit,
+    onImportBackground: (android.net.Uri) -> Unit,
+    onRemoveBackground: () -> Unit,
     onThemeChange: (ThemeMode) -> Unit,
     onGroupModeChange: (Boolean) -> Unit,
     onDismissNotice: () -> Unit,
@@ -109,6 +119,9 @@ fun SettingsScreen(
         if (stored.isNotEmpty()) syncedFromStore = true
     }
     var pendingCrop by remember { mutableStateOf<Pair<android.net.Uri, Boolean>?>(null) }
+    val backgroundPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) onImportBackground(uri)
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     LaunchedEffect(state.notice) {
@@ -163,6 +176,51 @@ fun SettingsScreen(
                                 },
                                 label = { Text(mode.label) },
                             )
+                        }
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val backgroundPath = state.avatars.chatBackground
+                        if (backgroundPath != null) {
+                            AsyncImage(
+                                model = File(backgroundPath),
+                                contentDescription = "聊天背景",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("聊天背景", fontWeight = FontWeight.Medium)
+                            Text(
+                                if (backgroundPath == null) "使用纯色背景" else "已使用自定义图片",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(
+                            onClick = {
+                                backgroundPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            },
+                        ) { Text("更换") }
+                        if (backgroundPath != null) {
+                            TextButton(onClick = onRemoveBackground) { Text("恢复默认") }
                         }
                     }
                 }
