@@ -967,13 +967,74 @@ private fun ChatInput(
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
-    Surface(
-        color = if (transparentBackground) Color.Transparent else MaterialTheme.colorScheme.background,
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        // 长期记忆只保留胶囊按钮本身，所在行不设背景，避免遮挡聊天内容
+        Box(
+            modifier = Modifier
+                .widthIn(max = 820.dp)
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
         ) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !editing,
+                enter = fadeIn() + scaleIn(initialScale = 0.9f),
+                exit = fadeOut() + scaleOut(targetScale = 0.9f),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (memoryEnabled) {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+                    },
+                    border = BorderStroke(
+                        1.dp,
+                        if (memoryEnabled) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        },
+                    ),
+                    modifier = Modifier.clickable { onToggleMemory() },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Memory,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (memoryEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "长期记忆",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (memoryEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        Surface(
+            color = if (transparentBackground) Color.Transparent else MaterialTheme.colorScheme.background,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
             AnimatedVisibility(
                 visible = editing,
                 enter = expandVertically() + fadeIn(),
@@ -1037,56 +1098,6 @@ private fun ChatInput(
                     }
                 }
             }
-            AnimatedVisibility(visible = !editing, enter = fadeIn(), exit = fadeOut()) {
-                Row(
-                    modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth().padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(18.dp),
-                    color = if (memoryEnabled) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    border = BorderStroke(
-                        1.dp,
-                        if (memoryEnabled) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant
-                        },
-                    ),
-                    modifier = Modifier.clickable { onToggleMemory() },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Rounded.Memory,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (memoryEnabled) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "长期记忆",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (memoryEnabled) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    }
-                }
-            }
-            }
             val canSend = sending || value.isNotBlank() || pendingImages.isNotEmpty()
             OutlinedTextField(
                 value = value,
@@ -1138,6 +1149,7 @@ private fun ChatInput(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            }
         }
     }
 }
