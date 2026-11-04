@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,11 +38,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Info
@@ -74,6 +78,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +88,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -129,6 +135,8 @@ fun ChatScreen(
     onSaveDraftPrompt: (String) -> Unit,
     onSelectDraftModel: (String?) -> Unit,
     onCreateGroup: (List<String>) -> Unit,
+    onEditMessage: (String, String) -> Unit,
+    onToggleMemory: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenMemories: () -> Unit,
     onEnsureSuggestions: () -> Unit,
@@ -167,12 +175,19 @@ fun ChatScreen(
                     onSaveDraftPrompt = onSaveDraftPrompt,
                     onSelectDraftModel = onSelectDraftModel,
                     onCreateGroup = onCreateGroup,
+                    onEditMessage = onEditMessage,
+                    onToggleMemory = onToggleMemory,
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                 )
             }
         } else {
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             val scope = rememberCoroutineScope()
+            val focusManager = LocalFocusManager.current
+            // 打开侧栏时收起键盘，避免输入框与输入法一直停留在前台
+            LaunchedEffect(drawerState.isOpen) {
+                if (drawerState.isOpen) focusManager.clearFocus()
+            }
             fun closeDrawer() { scope.launch { drawerState.close() } }
             ModalNavigationDrawer(
                 drawerState = drawerState,
@@ -197,7 +212,10 @@ fun ChatScreen(
                 ChatContent(
                     state = state,
                     compact = true,
-                    onMenu = { scope.launch { drawerState.open() } },
+                    onMenu = {
+                        focusManager.clearFocus()
+                        scope.launch { drawerState.open() }
+                    },
                     onSend = onSend,
                     onStop = onStop,
                     onNewChat = onNewChat,
@@ -209,6 +227,8 @@ fun ChatScreen(
                     onSaveDraftPrompt = onSaveDraftPrompt,
                     onSelectDraftModel = onSelectDraftModel,
                     onCreateGroup = onCreateGroup,
+                    onEditMessage = onEditMessage,
+                    onToggleMemory = onToggleMemory,
                 )
             }
         }
@@ -231,6 +251,8 @@ private fun ChatContent(
     onSaveDraftPrompt: (String) -> Unit,
     onSelectDraftModel: (String?) -> Unit,
     onCreateGroup: (List<String>) -> Unit,
+    onEditMessage: (String, String) -> Unit,
+    onToggleMemory: () -> Unit,
     modifier: Modifier = Modifier,
     onMenu: () -> Unit = {},
 ) {
@@ -240,6 +262,7 @@ private fun ChatContent(
     var showModelPicker by remember { mutableStateOf(false) }
     var showModelLocked by remember { mutableStateOf(false) }
     var showGroupCreate by remember { mutableStateOf(false) }
+    var editingMessage by remember { mutableStateOf<MessageEntity?>(null) }
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(MAX_ATTACHMENTS),
     ) { uris ->
@@ -249,6 +272,21 @@ private fun ChatContent(
     }
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    var autoFollow by remember { mutableStateOf(true) }
+    val isAtBottom by remember {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()
+            if (lastVisible == null) {
+                true
+            } else {
+                lastVisible.index >= info.totalItemsCount - 1 &&
+                    lastVisible.offset + lastVisible.size <= info.viewportEndOffset + 8
+            }
+        }
+    }
+    LaunchedEffect(isAtBottom) { autoFollow = isAtBottom }
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density)
@@ -256,6 +294,10 @@ private fun ChatContent(
     LaunchedEffect(imeBottom) {
         if (imeBottom > 0) {
             imeWasVisible = true
+            // 键盘弹出时，如果用户正停留在底部，让最后一条内容贴在输入框上方
+            if (autoFollow && state.messages.isNotEmpty()) {
+                listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+            }
         } else if (imeWasVisible) {
             // 键盘收起时释放输入框焦点，避免蓝色聚焦描边一直亮着
             focusManager.clearFocus()
@@ -283,8 +325,16 @@ private fun ChatContent(
             onDismissNotice()
         }
     }
-    LaunchedEffect(state.messages.size, state.messages.lastOrNull()?.content?.length) {
-        if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.lastIndex)
+    LaunchedEffect(state.messages.size) {
+        if (state.messages.isNotEmpty()) {
+            autoFollow = true
+            listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+        }
+    }
+    LaunchedEffect(state.messages.lastOrNull()?.content?.length) {
+        if (autoFollow && state.messages.isNotEmpty()) {
+            listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+        }
     }
 
     Scaffold(
@@ -343,7 +393,7 @@ private fun ChatContent(
                 onValueChange = { input = it },
                 sending = state.sending,
                 model = state.settings.model,
-                memoryEnabled = state.settings.memoryEnabled,
+                memoryEnabled = state.memoryOverride ?: state.settings.memoryEnabled,
                 pendingImages = pendingImages,
                 onPickImage = {
                     imagePicker.launch(
@@ -351,8 +401,21 @@ private fun ChatContent(
                     )
                 },
                 onRemoveImage = { uri -> pendingImages = pendingImages - uri },
+                editing = editingMessage != null,
+                onCancelEdit = {
+                    editingMessage = null
+                    input = ""
+                },
+                onToggleMemory = onToggleMemory,
                 onSend = {
-                    if ((input.isNotBlank() || pendingImages.isNotEmpty()) && !state.sending) {
+                    val editing = editingMessage
+                    if (editing != null) {
+                        if (input.isNotBlank() && !state.sending) {
+                            onEditMessage(editing.id, input)
+                            editingMessage = null
+                            input = ""
+                        }
+                    } else if ((input.isNotBlank() || pendingImages.isNotEmpty()) && !state.sending) {
                         onSend(input, pendingImages)
                         input = ""
                         pendingImages = emptyList()
@@ -362,40 +425,76 @@ private fun ChatContent(
             )
         },
     ) { padding ->
-        if (state.messages.isEmpty()) {
-            EmptyChat(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                suggestions = state.suggestions,
-                suggestionsLoading = state.suggestionsLoading,
-                onSuggestion = { onSend(it, emptyList()) },
-                onEnsureSuggestions = onEnsureSuggestions,
-                onRefreshSuggestions = onRefreshSuggestions,
-                onOpenSettings = if (state.currentConversationId == null) {
-                    { showDraftSettings = true }
-                } else {
-                    null
-                },
-                groupModeEnabled = state.settings.groupModeEnabled && state.currentConversationId == null,
-                onCreateGroup = { showGroupCreate = true },
-            )
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-            ) {
-                items(state.messages, key = { it.id }) { message ->
-                    val sender = message.senderConversationId
-                        ?.let { id -> state.conversations.firstOrNull { it.id == id } }
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        MessageItem(
-                            message = message,
-                            userAvatar = conversationUserAvatar,
-                            aiAvatar = sender?.aiAvatarPath ?: aiAvatar,
-                            senderName = message.senderName ?: sender?.title,
-                            showSender = isGroup,
-                            modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth(),
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (state.messages.isEmpty()) {
+                EmptyChat(
+                    modifier = Modifier.fillMaxSize(),
+                    suggestions = state.suggestions,
+                    suggestionsLoading = state.suggestionsLoading,
+                    onSuggestion = { onSend(it, emptyList()) },
+                    onEnsureSuggestions = onEnsureSuggestions,
+                    onRefreshSuggestions = onRefreshSuggestions,
+                    onOpenSettings = if (state.currentConversationId == null) {
+                        { showDraftSettings = true }
+                    } else {
+                        null
+                    },
+                    groupModeEnabled = state.settings.groupModeEnabled && state.currentConversationId == null,
+                    onCreateGroup = { showGroupCreate = true },
+                )
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    items(state.messages, key = { it.id }) { message ->
+                        val sender = message.senderConversationId
+                            ?.let { id -> state.conversations.firstOrNull { it.id == id } }
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            MessageItem(
+                                message = message,
+                                userAvatar = conversationUserAvatar,
+                                aiAvatar = sender?.aiAvatarPath ?: aiAvatar,
+                                senderName = message.senderName ?: sender?.title,
+                                showSender = isGroup,
+                                onEdit = if (!isGroup && message.role == MessageRole.USER) {
+                                    {
+                                        editingMessage = message
+                                        input = message.content
+                                        pendingImages = emptyList()
+                                    }
+                                } else {
+                                    null
+                                },
+                                modifier = Modifier.widthIn(max = 800.dp).fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+            if (state.messages.isNotEmpty() && !isAtBottom) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shadowElevation = 3.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 18.dp, bottom = 12.dp)
+                        .size(40.dp)
+                        .clickable {
+                            coroutineScope.launch {
+                                autoFollow = true
+                                listState.animateScrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+                            }
+                        },
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.ArrowDownward,
+                            contentDescription = "回到底部",
+                            modifier = Modifier.size(20.dp),
                         )
                     }
                 }
@@ -583,10 +682,12 @@ private fun MessageItem(
     aiAvatar: String?,
     senderName: String? = null,
     showSender: Boolean = false,
+    onEdit: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
     val isUser = message.role == MessageRole.USER
+    var actionsVisible by remember(message.id) { mutableStateOf(false) }
     val imageFiles = remember(message.imagePaths) {
         message.imagePaths.split('\n').filter { it.isNotBlank() }.map { File(it) }
     }
@@ -597,6 +698,7 @@ private fun MessageItem(
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
+                    modifier = Modifier.clickable { actionsVisible = !actionsVisible },
                 ) {
                     Column(
                         modifier = Modifier.padding(
@@ -631,12 +733,17 @@ private fun MessageItem(
                         }
                     }
                 }
-                if (message.content.isNotBlank()) {
-                    IconButton(
-                        onClick = { clipboard.setText(AnnotatedString(message.content)) },
-                        modifier = Modifier.size(32.dp),
+                if (actionsVisible && message.content.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
                     ) {
-                        Icon(Icons.Rounded.ContentCopy, "复制消息", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        MessageAction("复制", Icons.Rounded.ContentCopy) {
+                            clipboard.setText(AnnotatedString(message.content))
+                        }
+                        if (onEdit != null) {
+                            MessageAction("修改", Icons.Rounded.Edit, onClick = onEdit)
+                        }
                     }
                 }
             }
@@ -647,7 +754,9 @@ private fun MessageItem(
         Row(modifier = modifier, verticalAlignment = Alignment.Top) {
             ChatAvatar(aiAvatar, isUser = false, size = 34.dp)
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f).clickable { actionsVisible = !actionsVisible },
+            ) {
                 if (showSender && !senderName.isNullOrBlank()) {
                     Text(
                         senderName,
@@ -686,8 +795,13 @@ private fun MessageItem(
                         )
                     }
                     if (message.content.isNotBlank() && message.status != DeliveryStatus.STREAMING) {
-                        IconButton(onClick = { clipboard.setText(AnnotatedString(message.content)) }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Rounded.ContentCopy, "复制回答", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        // 复制按钮改为点击消息后在下方出现，平时保持界面干净
+                    }
+                }
+                if (actionsVisible && message.content.isNotBlank() && message.status != DeliveryStatus.STREAMING) {
+                    Row(horizontalArrangement = Arrangement.Start) {
+                        MessageAction("复制", Icons.Rounded.ContentCopy) {
+                            clipboard.setText(AnnotatedString(message.content))
                         }
                     }
                 }
@@ -697,6 +811,18 @@ private fun MessageItem(
 
     viewingImage?.let { file ->
         ImageViewerDialog(file = file, onDismiss = { viewingImage = null })
+    }
+}
+
+@Composable
+private fun MessageAction(label: String, icon: ImageVector, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall)
     }
 }
 
@@ -794,6 +920,9 @@ private fun ChatInput(
     pendingImages: List<Uri>,
     onPickImage: () -> Unit,
     onRemoveImage: (Uri) -> Unit,
+    editing: Boolean,
+    onCancelEdit: () -> Unit,
+    onToggleMemory: () -> Unit,
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -802,6 +931,29 @@ private fun ChatInput(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            if (editing) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 8.dp, bottomEnd = 8.dp),
+                    modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "修改输入",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = onCancelEdit, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Rounded.Close, contentDescription = "取消修改", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
             if (pendingImages.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -836,16 +988,75 @@ private fun ChatInput(
                     }
                 }
             }
+            Row(
+                modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (memoryEnabled) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    border = BorderStroke(
+                        1.dp,
+                        if (memoryEnabled) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                        } else {
+                            MaterialTheme.colorScheme.outlineVariant
+                        },
+                    ),
+                    modifier = Modifier.clickable { onToggleMemory() },
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Memory,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (memoryEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "长期记忆",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (memoryEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            }
             val canSend = sending || value.isNotBlank() || pendingImages.isNotEmpty()
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
                 enabled = !sending,
-                placeholder = { Text(if (pendingImages.isEmpty()) "给澜言发送消息…" else "补充图片说明（可选）…") },
+                placeholder = {
+                    Text(
+                        when {
+                            editing -> "修改这条消息…"
+                            pendingImages.isEmpty() -> "给澜言发送消息…"
+                            else -> "补充图片说明（可选）…"
+                        },
+                    )
+                },
                 maxLines = 6,
                 shape = RoundedCornerShape(24.dp),
                 leadingIcon = {
-                    IconButton(onClick = onPickImage, enabled = !sending && pendingImages.size < MAX_ATTACHMENTS) {
+                    IconButton(
+                        onClick = onPickImage,
+                        enabled = !sending && !editing && pendingImages.size < MAX_ATTACHMENTS,
+                    ) {
                         Icon(Icons.Rounded.Image, contentDescription = "添加图片")
                     }
                 },

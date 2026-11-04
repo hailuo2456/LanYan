@@ -50,6 +50,7 @@ data class MainUiState(
     val draftUserAvatar: String? = null,
     val draftSystemPrompt: String? = null,
     val draftModelProfileId: String? = null,
+    val memoryOverride: Boolean? = null,
     val notice: String? = null,
 )
 
@@ -61,6 +62,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     private var generationJob: Job? = null
     private var maintenanceJob: Job? = null
     private var suggestionsJob: Job? = null
+    private var launchSuggestionRefreshDone = false
 
     init {
         viewModelScope.launch {
@@ -82,7 +84,17 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             }
         }
         viewModelScope.launch {
-            container.settingsStore.settings.collect { settings -> _uiState.update { it.copy(settings = settings) } }
+            container.settingsStore.settings.collect { settings ->
+                _uiState.update { it.copy(settings = settings) }
+                // 每次启动应用刷新一次首页开场问题
+                if (!launchSuggestionRefreshDone) {
+                    launchSuggestionRefreshDone = true
+                    val configured = settings.resolveProfile()
+                        ?.let { it.baseUrl.isNotBlank() && it.modelName.isNotBlank() }
+                        ?: (settings.baseUrl.isNotBlank() && settings.model.isNotBlank())
+                    if (configured) generateSuggestions()
+                }
+            }
         }
         viewModelScope.launch {
             container.settingsStore.avatars.collect { avatars -> _uiState.update { it.copy(avatars = avatars) } }
@@ -159,7 +171,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
                 }
                 val effectiveSettings = settings.withProfile(
                     settings.resolveProfile(refreshedConversation.modelProfileId),
-                )
+                ).copy(memoryEnabled = _uiState.value.memoryOverride ?: settings.memoryEnabled)
                 val prompt = container.memoryEngine.prepare(
                     conversation = refreshedConversation,
                     messages = container.chatRepository.currentMessages(conversation.id),
@@ -191,7 +203,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
                 container.chatRepository.touchConversation(conversation.id)
                 maintenanceJob = viewModelScope.launch(Dispatchers.IO) {
                     runCatching { generateTitleIfNeeded(conversation.id, effectiveSettings) }
-                    if (settings.memoryEnabled && settings.autoOrganizeMemory) {
+                    if (effectiveSettings.memoryEnabled && settings.autoOrganizeMemory) {
                         runCatching { container.memoryConsolidator.learnFromTurn(text, conversation.id) }
                         runCatching {
                             container.memoryConsolidator.summarizeIfNeeded(conversation.id, effectiveSettings)
@@ -232,6 +244,102 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         generationJob?.cancel()
         generationJob = null
         _uiState.update { it.copy(sending = false) }
+    }
+
+    /** 输入框下方的「长期记忆」开关：只影响后续发送，不修改全局设置。 */
+    fun toggleMemoryOverride() {
+        _uiState.update { state ->
+            val current = state.memoryOverride ?: state.settings.memoryEnabled
+            state.copy(memoryOverride = !current)
+        }
+    }
+
+    /**
+     * 修改一条已发送的用户消息：更新内容、删除其后的消息并重新生成回复。
+     */
+    fun editUserMessage(messageId: String, newText: String) {
+        val text = newText.trim()
+        if (text.isBlank() || _uiState.value.sending) return
+        val conversationId = currentConversationId.value ?: return
+        val baseSettings = _uiState.value.settings
+        _uiState.update { it.copy(sending = true, notice = null) }
+        generationJob = viewModelScope.launch {
+            var pending: MessageEntity? = null
+            val partial = StringBuilder()
+            try {
+                val conversation = container.chatRepository.getConversation(conversationId) ?: return@launch
+                if (conversation.isGroup) {
+                    showNotice("群组对话暂不支持修改单条消息")
+                    return@launch
+                }
+                val all = container.chatRepository.currentMessages(conversationId)
+                val index = all.indexOfFirst { it.id == messageId }
+                if (index < 0) return@launch
+                container.chatRepository.updateMessage(all[index].copy(content = text, errorText = null))
+                all.drop(index + 1).forEach { container.chatRepository.deleteMessage(it) }
+                container.chatRepository.clearSummary(conversationId)
+
+                val memoryEnabled = _uiState.value.memoryOverride ?: baseSettings.memoryEnabled
+                val effective = baseSettings.withProfile(
+                    baseSettings.resolveProfile(conversation.modelProfileId),
+                ).copy(memoryEnabled = memoryEnabled)
+                val prompt = container.memoryEngine.prepare(
+                    conversation = conversation.copy(summary = "", summarizedMessageCount = 0),
+                    messages = container.chatRepository.currentMessages(conversationId),
+                    settings = effective,
+                )
+                val assistant = ChatRepository.pendingAssistant(conversationId).copy(
+                    usedMemoryIds = prompt.memoryIds.joinToString(","),
+                    usedSummary = prompt.usedSummary,
+                )
+                pending = assistant
+                container.chatRepository.saveMessage(assistant)
+                val answer = container.modelGateway.streamChat(effective, prompt.messages) { delta ->
+                    partial.append(delta)
+                    val streaming = assistant.copy(content = partial.toString())
+                    _uiState.update { state ->
+                        state.copy(
+                            messages = state.messages.map { message ->
+                                if (message.id == assistant.id) streaming else message
+                            },
+                        )
+                    }
+                }
+                container.chatRepository.updateMessage(
+                    assistant.copy(
+                        content = answer.ifBlank { "模型返回了空内容，请稍后重试。" },
+                        status = DeliveryStatus.COMPLETE,
+                    ),
+                )
+                container.chatRepository.touchConversation(conversationId)
+            } catch (cancelled: CancellationException) {
+                withContext(NonCancellable) {
+                    pending?.let { message ->
+                        if (partial.isBlank()) {
+                            container.chatRepository.deleteMessage(message)
+                        } else {
+                            container.chatRepository.updateMessage(
+                                message.copy(content = partial.toString(), status = DeliveryStatus.COMPLETE),
+                            )
+                        }
+                    }
+                }
+                throw cancelled
+            } catch (error: Exception) {
+                pending?.let { message ->
+                    container.chatRepository.updateMessage(
+                        message.copy(
+                            content = partial.toString(),
+                            status = DeliveryStatus.ERROR,
+                            errorText = error.message ?: "网络请求失败，请稍后重试",
+                        ),
+                    )
+                }
+                showNotice(error.message ?: "网络请求失败，请稍后重试")
+            } finally {
+                _uiState.update { it.copy(sending = false) }
+            }
+        }
     }
 
     fun newConversation() {

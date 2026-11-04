@@ -149,6 +149,12 @@ fun MemoryScreen(
                     }
                 } else {
                     val summaries = state.conversations.filter { it.summary.isNotBlank() }
+                    Text(
+                        "清除摘要将无法回复，请谨慎处理",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                     LazyColumn(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),

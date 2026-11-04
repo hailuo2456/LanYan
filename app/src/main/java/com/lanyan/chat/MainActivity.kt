@@ -76,6 +76,8 @@ class MainActivity : ComponentActivity() {
                                 onSaveDraftPrompt = mainViewModel::updateDraftPrompt,
                                 onSelectDraftModel = mainViewModel::selectDraftModel,
                                 onCreateGroup = mainViewModel::createGroup,
+                                onEditMessage = mainViewModel::editUserMessage,
+                                onToggleMemory = mainViewModel::toggleMemoryOverride,
                                 onOpenSettings = { navController.navigate("settings") },
                                 onOpenMemories = { navController.navigate("memories") },
                                 onEnsureSuggestions = mainViewModel::ensureSuggestions,
