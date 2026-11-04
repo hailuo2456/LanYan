@@ -15,6 +15,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -282,6 +283,8 @@ private fun ChatContent(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var autoFollow by remember { mutableStateOf(true) }
+    // ↓ 回到底部时正在播放滚动动画，避免流式输出的瞬时滚动打断动画
+    var smoothScrolling by remember { mutableStateOf(false) }
     val isAtBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -340,7 +343,7 @@ private fun ChatContent(
         }
     }
     LaunchedEffect(state.messages.lastOrNull()?.content?.length) {
-        if (autoFollow && state.messages.isNotEmpty()) {
+        if (autoFollow && !smoothScrolling && state.messages.isNotEmpty()) {
             listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
         }
     }
@@ -526,7 +529,23 @@ private fun ChatContent(
                         .clickable {
                             coroutineScope.launch {
                                 autoFollow = true
-                                listState.animateScrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+                                smoothScrolling = true
+                                try {
+                                    val lastIndex = state.messages.lastIndex
+                                    // 先平滑滚到最后一条，再把剩余距离补完，让整屏都是滚动动画
+                                    listState.animateScrollToItem(lastIndex)
+                                    val info = listState.layoutInfo
+                                    val last = info.visibleItemsInfo.lastOrNull { it.index == lastIndex }
+                                    if (last != null) {
+                                        val remaining = last.offset + last.size -
+                                            (info.viewportEndOffset - info.afterContentPadding)
+                                        if (remaining > 0) {
+                                            listState.animateScrollBy(remaining.toFloat())
+                                        }
+                                    }
+                                } finally {
+                                    smoothScrolling = false
+                                }
                             }
                         },
                 ) {
