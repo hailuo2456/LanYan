@@ -753,13 +753,16 @@ private fun MessageItem(
     }
     var viewingImage by remember { mutableStateOf<File?>(null) }
     if (isUser) {
-        Row(modifier = modifier, horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
-            Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
-                    modifier = Modifier.clickable { actionsVisible = !actionsVisible },
-                ) {
+        // 限制气泡最大宽度：左边不越过 AI 头像所在的列，长消息自动换行
+        BoxWithConstraints(modifier = modifier) {
+            val bubbleMaxWidth = (maxWidth - 90.dp).coerceAtLeast(120.dp)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Top) {
+                Column(horizontalAlignment = Alignment.End, modifier = Modifier.weight(1f)) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp),
+                        modifier = Modifier.widthIn(max = bubbleMaxWidth).clickable { actionsVisible = !actionsVisible },
+                    ) {
                     Column(
                         modifier = Modifier.padding(
                             horizontal = if (imageFiles.isEmpty()) 16.dp else 12.dp,
@@ -809,6 +812,7 @@ private fun MessageItem(
             }
             Spacer(Modifier.width(10.dp))
             ChatAvatar(userAvatar, isUser = true, size = 34.dp)
+        }
         }
     } else {
         Row(modifier = modifier, verticalAlignment = Alignment.Top) {

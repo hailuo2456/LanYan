@@ -9,7 +9,7 @@
 ![Platform](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white)
-![Version](https://img.shields.io/badge/version-1.6.3-blue)
+![Version](https://img.shields.io/badge/version-1.6.4-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
@@ -37,9 +37,9 @@
 
 ## 🚀 下载与安装
 
-[![Download APK](https://img.shields.io/badge/下载-LanYan--1.6.3.apk-2ea44f?logo=android&logoColor=white)](https://github.com/hailuo2456/LanYan/releases/latest)
+[![Download APK](https://img.shields.io/badge/下载-LanYan--1.6.4.apk-2ea44f?logo=android&logoColor=white)](https://github.com/hailuo2456/LanYan/releases/latest)
 
-点击上方按钮前往 [Releases](https://github.com/hailuo2456/LanYan/releases) 下载最新的 `LanYan-1.6.3.apk`，源码压缩包也在同一页面提供。
+点击上方按钮前往 [Releases](https://github.com/hailuo2456/LanYan/releases) 下载最新的 `LanYan-1.6.4.apk`，源码压缩包也在同一页面提供。
 
 > 想体验旧版？见 [历史版本归档（1.0.0 – 1.4.0）](https://github.com/hailuo2456/LanYan/releases/tag/legacy-builds)（已废弃的液态玻璃 Beta 未收录）。
 
