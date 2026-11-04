@@ -43,6 +43,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowDownward
@@ -73,7 +74,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -95,6 +95,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -971,63 +972,6 @@ private fun ChatInput(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // 长期记忆只保留胶囊按钮本身，所在行不设背景，避免遮挡聊天内容
-        Box(
-            modifier = Modifier
-                .widthIn(max = 820.dp)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
-        ) {
-            androidx.compose.animation.AnimatedVisibility(
-                visible = !editing,
-                enter = fadeIn() + scaleIn(initialScale = 0.9f),
-                exit = fadeOut() + scaleOut(targetScale = 0.9f),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = if (memoryEnabled) {
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
-                    },
-                    border = BorderStroke(
-                        1.dp,
-                        if (memoryEnabled) {
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-                        } else {
-                            MaterialTheme.colorScheme.outlineVariant
-                        },
-                    ),
-                    modifier = Modifier.clickable { onToggleMemory() },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Rounded.Memory,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (memoryEnabled) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "长期记忆",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (memoryEnabled) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                        )
-                    }
-                }
-            }
-        }
         Surface(
             color = if (transparentBackground) Color.Transparent else MaterialTheme.colorScheme.background,
         ) {
@@ -1099,48 +1043,131 @@ private fun ChatInput(
                 }
             }
             val canSend = sending || value.isNotBlank() || pendingImages.isNotEmpty()
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = !sending,
-                placeholder = {
-                    Text(
-                        when {
-                            editing -> "修改这条消息…"
-                            pendingImages.isEmpty() -> "给澜言发送消息…"
-                            else -> "补充图片说明（可选）…"
-                        },
-                    )
-                },
-                maxLines = 6,
+            // 输入框卡片：文字在上，长期记忆与发送等操作放在卡片内部下方
+            Surface(
                 shape = RoundedCornerShape(24.dp),
-                leadingIcon = {
-                    IconButton(
-                        onClick = onPickImage,
-                        enabled = !sending && !editing && pendingImages.size < MAX_ATTACHMENTS,
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 6.dp)) {
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        enabled = !sending,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        maxLines = 6,
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 36.dp)
+                                    .padding(horizontal = 4.dp),
+                            ) {
+                                if (value.isEmpty()) {
+                                    Text(
+                                        when {
+                                            editing -> "修改这条消息…"
+                                            pendingImages.isEmpty() -> "给澜言发送消息…"
+                                            else -> "补充图片说明（可选）…"
+                                        },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(Icons.Rounded.Image, contentDescription = "添加图片")
-                    }
-                },
-                trailingIcon = {
-                    IconButton(onClick = if (sending) onStop else onSend, enabled = canSend) {
-                        Surface(
-                            shape = CircleShape,
-                            color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                        IconButton(
+                            onClick = onPickImage,
+                            enabled = !sending && !editing && pendingImages.size < MAX_ATTACHMENTS,
+                            modifier = Modifier.size(38.dp),
                         ) {
-                            Box(modifier = Modifier.padding(8.dp)) {
-                                Icon(
-                                    if (sending) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
-                                    if (sending) "停止生成" else "发送",
-                                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp),
-                                )
+                            Icon(
+                                Icons.Rounded.Image,
+                                contentDescription = "添加图片",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        AnimatedVisibility(
+                            visible = !editing,
+                            enter = fadeIn() + scaleIn(initialScale = 0.9f),
+                            exit = fadeOut() + scaleOut(targetScale = 0.9f),
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = if (memoryEnabled) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+                                },
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (memoryEnabled) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                                    } else {
+                                        MaterialTheme.colorScheme.outlineVariant
+                                    },
+                                ),
+                                modifier = Modifier.padding(start = 4.dp).clickable { onToggleMemory() },
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Memory,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(15.dp),
+                                        tint = if (memoryEnabled) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                    Spacer(Modifier.width(5.dp))
+                                    Text(
+                                        "长期记忆",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (memoryEnabled) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(
+                            onClick = if (sending) onStop else onSend,
+                            enabled = canSend,
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            ) {
+                                Box(modifier = Modifier.padding(8.dp)) {
+                                    Icon(
+                                        if (sending) Icons.Rounded.Stop else Icons.Rounded.ArrowUpward,
+                                        if (sending) "停止生成" else "发送",
+                                        tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
                             }
                         }
                     }
-                },
-                modifier = Modifier.widthIn(max = 820.dp).fillMaxWidth(),
-            )
+                }
+            }
             Text(
                 "内容由 AI 生成，请核对重要信息${if (memoryEnabled) " · 长期记忆已开启" else ""}",
                 style = MaterialTheme.typography.labelSmall,
